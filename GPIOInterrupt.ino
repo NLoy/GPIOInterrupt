@@ -10,16 +10,12 @@ hw_timer_t* doubleClickTimer = NULL;
 // define variable type portMUX_TYPE, to allow for synchronization
 // between the main loop and the ISR, when modifying a shared variable
 // portMUX_TYPE timerMUX = portMUX_INITIALIZER_UNLOCKED;
-void IRAM_ATTR onTimer(void* arg2) {
+void IRAM_ATTR onTimer(void* buttonTemp) {
   buttonTemp.singlePressActive = false;
-  buttonTemp.clickType = "s";
+  buttonTemp.returnValue = buttonTemp.singleClickValue;
   buttonTemp.released = true;
 }
 // ------------------------------------------------------------------------------
-
-void ARDUINO_ISR_ATTR isr(void* arg) {
-  Button* s = static_cast<Button*>(arg);
-
 
 
 // -------------------------------------------------------------- BUTTON SETUP --
@@ -39,7 +35,6 @@ struct Button {
   bool released;
   bool toggleOn;
   bool singlePressActive;
-  char clickType;
   char singleClickValue;
   char doubleClickValue;
   char longPressValue;
@@ -62,7 +57,7 @@ z = base value, Tasker to ignore if set to this
 Button button1 = { 0, "1" 0, false, 0, 0, 0, false, true, false, "l", "d", "x", "z"};
 Button button2 = { 26, "2", 0, false, 0, 0, 0, false, true, false, "n", "v", "x", "z"};
 uint8_t numButtons = 2;  // Match to total number of buttons
-Button buttonsUsed[numButtons] = {button1, button2};
+Button buttonsUsed[numButtons] = {button1, button2}; // Include all button variables
 
 
 // Main Interrupt for button presses
@@ -89,17 +84,17 @@ void ARDUINO_ISR_ATTR isr(void* arg) {
 
     // Check if single click or second of a double click
     if (s->timePressed > longPressTime) {       // ON LONG PRESS
-      s->clickType = "l";
+      s->buttonReturn = s->longPressValue;
       s->released = true;
 
     } else if (s->singlePressActive != true) {  // ON FIRST CLICK
-      s->singlePressActive = true;
+      s->singlePressActive =; true;
       TODO start doubleclick timer##############
 
     } else {                                    // ON SECOND CLICK
       TODO end doubleclick timer##############
       s->singlePressActive = false;
-      s->clickType = "d";
+      s->buttonReturn = s->doubleClickValue
       s->released = true;
     }
   }

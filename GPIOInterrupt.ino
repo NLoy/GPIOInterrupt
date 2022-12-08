@@ -1,32 +1,11 @@
 #include <Arduino.h>
 
-// ------------------------------------------------------ TIMER INTERRUPT SETUP--
-// IRC counter, volatile to exempt from compiler optimizations
-// volatile int interruptCounter;
-
-// define timer as hw_timer_t type, set to Null
-hw_timer_t* doubleClickTimer = NULL;
-
-// define variable type portMUX_TYPE, to allow for synchronization
-// between the main loop and the ISR, when modifying a shared variable
-// portMUX_TYPE timerMUX = portMUX_INITIALIZER_UNLOCKED;
-void IRAM_ATTR onTimer(void* buttonTemp) {
-  buttonTemp.singlePressActive = false;
-  buttonTemp.returnValue = buttonTemp.singleClickValue;
-  buttonTemp.released = true;
-}
-// ------------------------------------------------------------------------------
-
 
 // -------------------------------------------------------------- BUTTON SETUP --
-// define the time variables for debounce, double click, and a long press
-const uint8_t  debounceTime = 50;
-const uint16_t longPressTime 3000;
-const uint16_t doubleClickTime = 350;
-
 struct Button {
-  const uint8_t PIN;
+  uint8_t PIN;
   char buttonName;
+  uint8_t NUM;
   uint32_t numberKeyPresses;
   bool pressed;
   uint32_t lastTriggerTime;
@@ -38,9 +17,8 @@ struct Button {
   char singleClickValue;
   char doubleClickValue;
   char longPressValue;
-  char buttonReturn = "z";
+  char buttonReturn;
 };
-
 
 /*  CHAR CODE FOR BUTTON CHAR VALUES
 n = next song
@@ -53,16 +31,34 @@ d = volume down
 z = base value, Tasker to ignore if set to this
 */
 
+// define the time variables for debounce, double click, and a long press
+const uint8_t debounceTime = 50;
+const uint16_t longPressTime = 3000;
+const uint16_t doubleClickTime = 350;
+
 // Button Initialization
-Button button1 = { 0, "1" 0, false, 0, 0, 0, false, true, false, "l", "d", "x", "z"};
-Button button2 = { 26, "2", 0, false, 0, 0, 0, false, true, false, "n", "v", "x", "z"};
-uint8_t numButtons = 2;  // Match to total number of buttons
-Button buttonsUsed[numButtons] = {button1, button2}; // Include all button variables
+Button buttonA = { 0, 'A', 0, 0, false, 0, 0, 0, false, true, false, 'l', 'd', 'x', 'z'};
+Button buttonB = {26, 'B', 1, 0, false, 0, 0, 0, false, true, false, 'n', 'v', 'x', 'z'};
+const uint8_t numButtons = 2;                                 // Match to total number of buttons, max of 4 timer interrupts for esp32
+Button buttonsUsed[numButtons] = { buttonA, buttonB };  // Include all button variables
+// ------------------------------------------------------------------------------
 
 
-// Main Interrupt for button presses
-void ARDUINO_ISR_ATTR isr(void* arg) {
-  Button* s = static_cast<Button*>(arg);
+
+// ------------------------------------------------------ TIMER INTERRUPT SETUP--
+// IRC counter, volatile to exempt from compiler optimizations
+// volatile int interruptCounter;
+
+// define timer as hw_timer_t type, set to NULL
+hw_timer_t * doubleClickTimer[numButtons] = {};
+// ------------------------------------------------------------------------------
+
+
+
+// ------------------------------------------------- BUTTON INTERRUPT FUNCTION --
+void ARDUINO_ISR_ATTR isr(void *arg) {
+  Button *s = static_cast<Button*>(arg);
+  // s is a pointer to the static_cast pointer of the arg
 
   // Get current time of event
   s->curTriggerTime = millis();
@@ -74,94 +70,113 @@ void ARDUINO_ISR_ATTR isr(void* arg) {
   }
 
   // Check if this is a button press or button release
-  if (s->pressed == false) {             // ON BUTTON PRESS
+  if (s->pressed == false) {  // ON BUTTON PRESS
     s->pressed = true;
 
-  } else {                               // ON BUTTON RELEASE
+  } else {  // ON BUTTON RELEASE
     s->pressed = false;
     s->timePressed = (s->curTriggerTime - s->lastTriggerTime);
     s->lastTriggerTime = s->curTriggerTime;
 
     // Check if single click or second of a double click
-    if (s->timePressed > longPressTime) {       // ON LONG PRESS
+    if (s->timePressed > longPressTime) {  // ON LONG PRESS
       s->buttonReturn = s->longPressValue;
       s->released = true;
 
     } else if (s->singlePressActive != true) {  // ON FIRST CLICK
-      s->singlePressActive =; true;
-      TODO start doubleclick timer##############
-
-    } else {                                    // ON SECOND CLICK
-      TODO end doubleclick timer##############
+      s->singlePressActive = true;
+      //////////////////////////////////// TODO start doubleclick timer##############
+      timerStart(doubleClickTimer[s->NUM]);
+    } else {  // ON SECOND CLICK
+      //////////////////////////////////// TODO end doubleclick timer##############
+      timerStop(doubleClickTimer[s->NUM]);
+      timerWrite(doubleClickTimer[s->NUM], 0);
       s->singlePressActive = false;
-      s->buttonReturn = s->doubleClickValue
+      s->buttonReturn = s->doubleClickValue;
       s->released = true;
     }
   }
 }
+// ------------------------------------------------------------------------------
+
+
+
+// -------------------------------------------------- TIMER INTERRUPT FUNCTION --
+Void IRAM_ATTR onTimer() {
+  Button timerButton = timerButtonTemp;
+  timerButton.buttonReturn = timerButton.singleClickValue;
+}
+
+
+  //////////////////TO DO - SET UP A WAY TO KEEP TRACK OF WHICH BUTTONS ARE
+// ACTIVE ON TIMERS, AND HAVE THE onTimer CHECK ALL OF THEM FOR WHICH IS THE 
+// CURRENT ONE TO SET IT OFF WHENEVER IT'S CALLED. NO ARG PASSING ALLOWED TO 
+// onTimer function apparently, so this will be a workaround
+
+
+
+
 
 // ------------------------------------------------------------------------------
 
 
+
+// ---------------------------------------------------------------- VOID SETUP --
 void setup() {
   Serial.begin(115200);
 
-  // ---------------------------------------------------- TIMER INTERRUPT SETUP--
-  // Initialize the timer, with variables: (#/4) of which interrupt
-  // (lower is higher priority?), value of prescaler to get 1 millisecond,
-  // whether to count up /true or down /false
-  doubleClickTimer = timerBegin(0, 80, true);
+  for (uint8_t i = 0; i < numButtons; i++) {
 
-  // Attach ISR to a handling function, with variables:
-  // Name of function, ISR function to attach (&onTimer), whether
-  // to trigger on edge /true, or level /false
-  timerAttachInterrupt(doubleClickTimer, &onTimer, true);
+    // --------------------------------- BUTTON INTERRUPT INITIALIZATION --------
+    Button button = buttonsUsed[i];
+    pinMode(button.PIN, INPUT_PULLUP);
+    attachInterruptArg(button.PIN, isr, &button, CHANGE);
+    // --------------------------------------------------------------------------
 
-  // timername, time of timer, whether to repeat
-  timerAlarmWrite(doubleClickTimer, doubleClickTime, false);
-  timerAlarmEnable(doubleClickTimer);
+    // ---------------------------------- TIMER INTERRUPT INITIALIZATION --------
+    // Check to see if i is greater than available # of timer interrupts
+    if (i >= 4) {
+      continue;
+    }
+    // Initialize the timer, with variables: (# = 0,1,2,3) of which interrupt
+    // (lower is higher priority?), value of prescaler to get 1 millisecond,
+    // whether to count up /true or down /false
+    doubleClickTimer[i] = timerBegin(i, 80, true);
 
-  timerEnd(doubleClickTimer);
-  // ----------------------------------------------------------------------------
+    // Attach ISR to a handling function, with variables:
+    // Name of function, ISR function to attach (&onTimer), whether
+    // to trigger on edge (true), or level (false)
+    Button timerButtonTemp = buttonsUsed[i];
+    timerAttachInterrupt(doubleClickTimer[i], void (*onTimer)(), true);
 
-  // ------------------------------------------------------------ BUTTON SETUP --
-  pinMode(button1.PIN, INPUT_PULLUP);
-  attachInterruptArg(button1.PIN, isr, &button1, CHANGE);
-  pinMode(button2.PIN, INPUT_PULLUP);
-  attachInterruptArg(button2.PIN, isr, &button2, CHANGE);
+    // timername, time of timer, whether to repeat
+    timerAlarmWrite(doubleClickTimer[i], doubleClickTime, false);
+
+    // Enables the timerAlarm of: timername - does NOT start the timer!
+    timerAlarmEnable(doubleClickTimer[i]);
+    // --------------------------------------------------------------------------
+  }
 }
 
 void loop() {
 
   // ------------------------------------------------------ BUTTON INPUT CHECK --
   for (uint8_t i = 0; i < numButtons; i++) {
-    if (buttonsUsed[i].released) {
-      switch (buttonsUsed[i].clickType) {
-        case "s":  // SINGLE CLICK FUNCTION CALL
-          buttonReturn = buttonsUsed[i].singleClickValue());
-          break;
-        case "d":  // DOUBLE CLICK FUNCTION CALL
-          buttonReturn = buttonsUsed[i].doubleClickValue());
-          break;
-        case "l":  // LONG PRESS FUNCTION CALL
-          buttonReturn = buttonsUsed[i].longPressValue());
-          break;
-      }
-    Serial.println(buttonUsed[i].buttonName + ": " + buttonReturn);
-    buttonReturn = "z"; // base value, tasker to ignore if set to this
-    }
+    Button button = buttonsUsed[i];
+    if (button.released) {
+      Serial.printf("Button %u: %u\n", button.buttonName, button.buttonReturn);
+      button.buttonReturn = 'z';  // base value, tasker to ignore if set to this
     
+    }
   }
+}
 
-  Serial.println(String()
-
-
-/*
+  /*
   if (button1.released) {
     button1.released = false;        // Reset released value regardless of press type
-    if (button1.clickType == "s") {  // Button 1
+    if (button1.clickType == 's') {  // Button 1
       // If button 1 is long pressed
-      Serial.println("Button 1 was long pressed for longer than 3 seconds, and the interrupt function toggled on/off.");
+      Serial.println('Button 1 was long pressed for longer than 3 seconds, and the interrupt function toggled on/off.');
       button1.toggleOn = !button1.toggleOn;  // Does not detach the interrupt, just toggles this loop to register it or not
       return;
       // If button 1 interrupt is disabled and not long pressed
@@ -172,12 +187,12 @@ void loop() {
       button1.curRelease = button1.lastTriggerTime;
       if ((button1.curRelease - button1.lastRelease) <= doubleClickTime) {  // Button 1 double click timing definition
         // If button 1 is double pressed (long press doesn't count as a second press)
-        Serial.printf("Button 1 was double pressed!!! There were only %u milliseconds between the last two presses!\n", (button1.curRelease - button1.lastRelease));
+        Serial.printf('Button 1 was double pressed!!! There were only %u milliseconds between the last two presses!\n', (button1.curRelease - button1.lastRelease));
       } else {
         // If button 1 is single pressed
 
         button1.numberKeyPresses++;
-        Serial.printf("Button 1 has been pressed %u times. The last press was %u milliseconds long.\n", button1.numberKeyPresses, button1.timePressed);
+        Serial.printf('Button 1 has been pressed %u times. The last press was %u milliseconds long.\n', button1.numberKeyPresses, button1.timePressed);
       }
       button1.lastRelease = button1.lastTriggerTime;
     }
@@ -189,13 +204,12 @@ void loop() {
   }
 */
 
-}
 
 /*
 void button2SingleClick() {
   button2.curRelease = button2.lastTriggerTime;
   button2.numberKeyPresses++;
-  Serial.printf("Button 2 has been pressed %u times. The last press was %u milliseconds long.\n", button2.numberKeyPresses, button2.timePressed);
+  Serial.printf('Button 2 has been pressed %u times. The last press was %u milliseconds long.\n', button2.numberKeyPresses, button2.timePressed);
   button2.released = false;
   button2.curRelease = button2.lastTriggerTime;
 }

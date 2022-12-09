@@ -99,30 +99,34 @@ void ARDUINO_ISR_ATTR isr(void* arg) {
 // -------------------------------------------------- TIMER INTERRUPT FUNCTION --
  // Interrupt timer function for button number 0
  void IRAM_ATTR onTimer0() {
-  //Button *s = static_cast<Button*>(arg);
-  //arg->buttonReturn = arg->singleClickValue;
-  //arg->released = true;
+   Button tempButton = buttonsUsed[0];
+   tempButton.buttonReturn = tempButton.singleClickValue;
+   tempButton.singlePressActive = false;
+   tempButton.released = true;
 }
 
  // Interrupt timer function for button number 1
 void IRAM_ATTR onTimer1() {
-  //Button *s = static_cast<Button*>(arg);
-  //arg->buttonReturn = arg->singleClickValue;
-  //arg->released = true;
+   Button tempButton = buttonsUsed[1];
+   tempButton.buttonReturn = tempButton.singleClickValue;
+   tempButton.singlePressActive = false;
+   tempButton.released = true;
 }
 
  // Interrupt timer function for button number 2
 void IRAM_ATTR onTimer2() {
-  //Button *s = static_cast<Button*>(arg);
-  //arg->buttonReturn = arg->singleClickValue;
-  //arg->released = true;
+   Button tempButton = buttonsUsed[2];
+   tempButton.buttonReturn = tempButton.singleClickValue;
+   tempButton.singlePressActive = false;
+   tempButton.released = true;
 }
 
  // Interrupt timer function for button number 3
 void IRAM_ATTR onTimer3() { 
-  //Button *s = static_cast<Button*>(arg);
-  //arg->buttonReturn = arg->singleClickValue;
-  //arg->released = true;
+   Button tempButton = buttonsUsed[3];
+   tempButton.buttonReturn = tempButton.singleClickValue;
+   tempButton.singlePressActive = false;
+   tempButton.released = true;
 }
 
  // Create an array of the interrupt timer functions

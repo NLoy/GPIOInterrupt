@@ -1,10 +1,11 @@
 #include <Arduino.h>
+#include <string>
 
 
 // -------------------------------------------------------------- BUTTON SETUP --
 struct Button {
   uint8_t PIN;
-  char buttonName;
+  String buttonName;
   uint8_t NUM;
   uint32_t numberKeyPresses;
   bool pressed;
@@ -14,22 +15,12 @@ struct Button {
   bool released;
   bool toggleOn;
   bool singlePressActive;
-  char singleClickValue;
-  char doubleClickValue;
-  char longPressValue;
-  char buttonReturn;
+  String singleClickValue;
+  String doubleClickValue;
+  String longPressValue;
+  String buttonReturn;
 };
 
-/*  CHAR CODE FOR BUTTON CHAR VALUES
-n = next song
-l = last song
-p = toggle pause/play
-v = activate google assistant
-x = turn off screen
-u = volume up
-d = volume down
-z = base value, Tasker to ignore if set to this
-*/
 
 // define the time variables for debounce, double click, and a long press
 const uint8_t debounceTime = 50;
@@ -37,8 +28,8 @@ const uint16_t longPressTime = 3000;
 const uint16_t doubleClickTime = 350;
 
 // Button Initialization
-Button buttonA = { 0, 'A', 0, 0, false, 0, 0, 0, false, true, false, 'l', 'd', 'x', 'z'};
-Button buttonB = {26, 'B', 1, 0, false, 0, 0, 0, false, true, false, 'n', 'v', 'x', 'z'};
+Button buttonA = { 0, "Front", 0, 0, false, 0, 0, 0, false, true, false, "toggle_play_pause", "activate_google_assistant", "turn_off_screen", "none"};
+Button buttonB = {26,  "Side", 1, 0, false, 0, 0, 0, false, true, false, "next_song",         "last_song", "navigate_home", "none"};
 const uint8_t numButtons = 2;                                 // Match to total number of buttons, max of 4 timer interrupts for esp32
 Button buttonsUsed[numButtons] = { buttonA, buttonB };  // Include all button variables
 // ------------------------------------------------------------------------------
@@ -50,15 +41,19 @@ Button buttonsUsed[numButtons] = { buttonA, buttonB };  // Include all button va
 // volatile int interruptCounter;
 
 // define timer as hw_timer_t type, set to NULL
-hw_timer_t * doubleClickTimer[numButtons] = {};
+ hw_timer_t * doubleClickTimer[numButtons] = {NULL};
 // ------------------------------------------------------------------------------
 
 
 
 // ------------------------------------------------- BUTTON INTERRUPT FUNCTION --
-void ARDUINO_ISR_ATTR isr(void *arg) {
-  Button *s = static_cast<Button*>(arg);
-  // s is a pointer to the static_cast pointer of the arg
+// ISR function that returns nothing, takes as argument a /void pointer/ to the memory address of a function
+// "A void pointer is a pointer that has no associated data type with it. A void pointer can hold address of any type 
+// and can be typecasted to any type. Void pointers cannot be dereferenced with *arg to get value of arg"
+void ARDUINO_ISR_ATTR isr(void* arg) {
+  //s is a pointer (Button type) to the given (void pointer arg) static_cast as a Button type
+  Button *s = static_cast<Button*>(arg); 
+    // static_cast<new-type>(expression) :::: Returns a value of type "new-type"
 
   // Get current time of event
   s->curTriggerTime = millis();
@@ -102,11 +97,11 @@ void ARDUINO_ISR_ATTR isr(void *arg) {
 
 
 // -------------------------------------------------- TIMER INTERRUPT FUNCTION --
-Void IRAM_ATTR onTimer() {
-  Button timerButton = timerButtonTemp;
-  timerButton.buttonReturn = timerButton.singleClickValue;
+void IRAM_ATTR onTimer() {
+  //Button *s = static_cast<Button*>(arg);
+  //arg->buttonReturn = arg->singleClickValue;
+  //arg->released = true;
 }
-
 
   //////////////////TO DO - SET UP A WAY TO KEEP TRACK OF WHICH BUTTONS ARE
 // ACTIVE ON TIMERS, AND HAVE THE onTimer CHECK ALL OF THEM FOR WHICH IS THE 
@@ -144,11 +139,10 @@ void setup() {
     doubleClickTimer[i] = timerBegin(i, 80, true);
 
     // Attach ISR to a handling function, with variables:
-    // Name of function, ISR function to attach (&onTimer), whether
+    // Name of timer, ISR function pointer to attach (&onTimer), whether
     // to trigger on edge (true), or level (false)
-    Button timerButtonTemp = buttonsUsed[i];
-    timerAttachInterrupt(doubleClickTimer[i], void (*onTimer)(), true);
-
+    timerAttachInterrupt(doubleClickTimer[i], *onTimer, true);
+  //      attachInterruptArg(button.PIN, isr, &button, CHANGE);
     // timername, time of timer, whether to repeat
     timerAlarmWrite(doubleClickTimer[i], doubleClickTime, false);
 

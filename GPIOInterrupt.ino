@@ -97,19 +97,36 @@ void ARDUINO_ISR_ATTR isr(void* arg) {
 
 
 // -------------------------------------------------- TIMER INTERRUPT FUNCTION --
-void IRAM_ATTR onTimer() {
+ // Interrupt timer function for button number 0
+ void IRAM_ATTR onTimer0() {
   //Button *s = static_cast<Button*>(arg);
   //arg->buttonReturn = arg->singleClickValue;
   //arg->released = true;
 }
 
-  //////////////////TO DO - SET UP A WAY TO KEEP TRACK OF WHICH BUTTONS ARE
-// ACTIVE ON TIMERS, AND HAVE THE onTimer CHECK ALL OF THEM FOR WHICH IS THE 
-// CURRENT ONE TO SET IT OFF WHENEVER IT'S CALLED. NO ARG PASSING ALLOWED TO 
-// onTimer function apparently, so this will be a workaround
+ // Interrupt timer function for button number 1
+void IRAM_ATTR onTimer1() {
+  //Button *s = static_cast<Button*>(arg);
+  //arg->buttonReturn = arg->singleClickValue;
+  //arg->released = true;
+}
 
+ // Interrupt timer function for button number 2
+void IRAM_ATTR onTimer2() {
+  //Button *s = static_cast<Button*>(arg);
+  //arg->buttonReturn = arg->singleClickValue;
+  //arg->released = true;
+}
 
+ // Interrupt timer function for button number 3
+void IRAM_ATTR onTimer3() { 
+  //Button *s = static_cast<Button*>(arg);
+  //arg->buttonReturn = arg->singleClickValue;
+  //arg->released = true;
+}
 
+ // Create an array of the interrupt timer functions
+void (*onTimers[numButtons])() = {NULL};
 
 
 // ------------------------------------------------------------------------------
@@ -138,10 +155,26 @@ void setup() {
     // whether to count up /true or down /false
     doubleClickTimer[i] = timerBegin(i, 80, true);
 
+    // Add the individual onTimer# pointers to the pointer array of onTimers
+    switch (i) {
+      case 0:
+        onTimers[i] = &onTimer0;
+        break;
+      case 1:
+        onTimers[i] = &onTimer1;
+        break;
+      case 2:
+        onTimers[i] = &onTimer2;
+        break;
+      case 3:
+        onTimers[i] = &onTimer3;
+        break;
+    }
+
     // Attach ISR to a handling function, with variables:
     // Name of timer, ISR function pointer to attach (&onTimer), whether
     // to trigger on edge (true), or level (false)
-    timerAttachInterrupt(doubleClickTimer[i], *onTimer, true);
+    timerAttachInterrupt(doubleClickTimer[i], onTimers[i], true);
   //      attachInterruptArg(button.PIN, isr, &button, CHANGE);
     // timername, time of timer, whether to repeat
     timerAlarmWrite(doubleClickTimer[i], doubleClickTime, false);

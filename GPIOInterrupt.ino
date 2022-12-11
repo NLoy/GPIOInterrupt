@@ -29,9 +29,9 @@ const uint16_t doubleClickTime = 350;
 
 // Button Initialization
 Button buttonA = { 0, "Front", 0, 0, false, 0, 0, 0, false, true, false, "toggle_play_pause", "activate_google_assistant", "turn_off_screen", "none"};
-Button buttonB = {26,  "Side", 1, 0, false, 0, 0, 0, false, true, false, "next_song",         "last_song", "navigate_home", "none"};
+Button buttonB = {26, "Side",  1, 0, false, 0, 0, 0, false, true, false, "next_song",         "last_song", "navigate_home", "none"};
 const uint8_t numButtons = 2;                                 // Match to total number of buttons, max of 4 timer interrupts for esp32
-Button buttonsUsed[numButtons] = { buttonA, buttonB };  // Include all button variables
+Button buttonsUsed[numButtons] = { buttonA, buttonB };  // Include all button variables, only first (4) index locations use interrupts (allows double click)
 // ------------------------------------------------------------------------------
 
 
@@ -46,8 +46,6 @@ hw_timer_t* doubleClickTimer1 = NULL;
 hw_timer_t* doubleClickTimer2 = NULL;
 hw_timer_t* doubleClickTimer3 = NULL;
 
-// Create array of hw_timer_t pointer types
-hw_timer_t* doubleClickTimer[numButtons] = {NULL};
 // ------------------------------------------------------------------------------
 
 
@@ -86,12 +84,40 @@ void ARDUINO_ISR_ATTR isr(void* arg) {
 
     } else if (s->singlePressActive != true) {  // ON FIRST CLICK
       s->singlePressActive = true;
-      //////////////////////////////////// TODO start doubleclick timer##############
-      timerStart(doubleClickTimer[s->NUM]);
+      switch(s->NUM) {
+        case 0:
+          timerStart(doubleClickTimer0);
+          break;
+        case 1:
+          timerStart(doubleClickTimer1);
+          break;
+        case 2:
+          timerStart(doubleClickTimer2);
+          break;
+        case 3:
+          timerStart(doubleClickTimer3);
+          break;
+      }
+
     } else {  // ON SECOND CLICK
-      //////////////////////////////////// TODO end doubleclick timer##############
-      timerStop(doubleClickTimer[s->NUM]);
-      timerWrite(doubleClickTimer[s->NUM], 0);
+      switch(s->NUM) {
+        case 0:
+          timerStop(doubleClickTimer0);
+          timerWrite(doubleClickTimer0, 0);
+          break;
+        case 1:
+          timerStop(doubleClickTimer1);
+          timerWrite(doubleClickTimer1, 0);
+          break;
+        case 2:
+          timerStop(doubleClickTimer2);
+          timerWrite(doubleClickTimer2, 0);
+          break;
+        case 3:
+          timerStop(doubleClickTimer3);
+          timerWrite(doubleClickTimer3, 0);
+          break;
+      }
       s->singlePressActive = false;
       s->buttonReturn = s->doubleClickValue;
       s->released = true;
@@ -138,11 +164,6 @@ void IRAM_ATTR onTimer3() {
   tempButton.released = true;
   Serial.println("onTimer3 debug");
 }
-
- // Create an array of the interrupt timer functions
-void (*onTimers[numButtons])() = {NULL};
-
-
 // ------------------------------------------------------------------------------
 
 
@@ -164,37 +185,64 @@ void setup() {
     if (i >= 4) {
       continue;
     }
-    // Initialize the timer, with variables: (# = 0,1,2,3) of which interrupt
-    // (lower is higher priority?), value of prescaler to get 1 millisecond,
-    // whether to count up /true or down /false
-    doubleClickTimer[i] = timerBegin(i, 80, true);
-
-    // Add the individual onTimer# pointers to the pointer array of onTimers
     switch (i) {
       case 0:
-        onTimers[i] = &onTimer0;
+        // Initialize the timer, with variables: (# = 0,1,2,3) of which interrupt
+        // (lower is higher priority?), value of prescaler to get 1 millisecond,
+        // whether to count up /true or down /false
+        doubleClickTimer0 = timerBegin(0, 80, true);
+        // Attach ISR to a handling function, with variables:
+        // Name of timer, ISR function pointer to attach (&onTimer), whether
+        // to trigger on edge (true), or level (false)
+        timerAttachInterrupt(doubleClickTimer0, &onTimer0, true);
+        // timername, time of timer, whether to repeat
+        timerAlarmWrite(doubleClickTimer0, doubleClickTime, false);
+        // Enables the timerAlarm of: timername - does NOT start the timer!
+        timerAlarmEnable(doubleClickTimer0);
         break;
       case 1:
-        onTimers[i] = &onTimer1;
+        // Initialize the timer, with variables: (# = 0,1,2,3) of which interrupt
+        // (lower is higher priority?), value of prescaler to get 1 millisecond,
+        // whether to count up /true or down /false
+        doubleClickTimer1 = timerBegin(1, 80, true);
+        // Attach ISR to a handling function, with variables:
+        // Name of timer, ISR function pointer to attach (&onTimer), whether
+        // to trigger on edge (true), or level (false)
+        timerAttachInterrupt(doubleClickTimer1, &onTimer1, true);
+        // timername, time of timer, whether to repeat
+        timerAlarmWrite(doubleClickTimer1, doubleClickTime, false);
+        // Enables the timerAlarm of: timername - does NOT start the timer!
+        timerAlarmEnable(doubleClickTimer1);
         break;
       case 2:
-        onTimers[i] = &onTimer2;
+        // Initialize the timer, with variables: (# = 0,1,2,3) of which interrupt
+        // (lower is higher priority?), value of prescaler to get 1 millisecond,
+        // whether to count up /true or down /false
+        doubleClickTimer2 = timerBegin(2, 80, true);
+        // Attach ISR to a handling function, with variables:
+        // Name of timer, ISR function pointer to attach (&onTimer), whether
+        // to trigger on edge (true), or level (false)
+        timerAttachInterrupt(doubleClickTimer2, &onTimer2, true);
+        // timername, time of timer, whether to repeat
+        timerAlarmWrite(doubleClickTimer2, doubleClickTime, false);
+        // Enables the timerAlarm of: timername - does NOT start the timer!
+        timerAlarmEnable(doubleClickTimer2);
         break;
       case 3:
-        onTimers[i] = &onTimer3;
+        // Initialize the timer, with variables: (# = 0,1,2,3) of which interrupt
+        // (lower is higher priority?), value of prescaler to get 1 millisecond,
+        // whether to count up /true or down /false
+        doubleClickTimer3 = timerBegin(3, 80, true);
+        // Attach ISR to a handling function, with variables:
+        // Name of timer, ISR function pointer to attach (&onTimer), whether
+        // to trigger on edge (true), or level (false)
+        timerAttachInterrupt(doubleClickTimer3, &onTimer3, true);
+        // timername, time of timer, whether to repeat
+        timerAlarmWrite(doubleClickTimer3, doubleClickTime, false);
+        // Enables the timerAlarm of: timername - does NOT start the timer!
+        timerAlarmEnable(doubleClickTimer3);
         break;
     }
-
-    // Attach ISR to a handling function, with variables:
-    // Name of timer, ISR function pointer to attach (&onTimer), whether
-    // to trigger on edge (true), or level (false)
-    timerAttachInterrupt(doubleClickTimer[i], onTimers[i], true);
-  //      attachInterruptArg(button.PIN, isr, &button, CHANGE);
-    // timername, time of timer, whether to repeat
-    timerAlarmWrite(doubleClickTimer[i], doubleClickTime, false);
-
-    // Enables the timerAlarm of: timername - does NOT start the timer!
-    timerAlarmEnable(doubleClickTimer[i]);
     // --------------------------------------------------------------------------
   }
 }
@@ -203,11 +251,11 @@ void loop() {
   // ------------------------------------------------------ BUTTON INPUT CHECK --
   for (uint8_t i = 0; i < numButtons; i++) {
     Button* button = &buttonsUsed[i];
-    Serial.printf("Button %s . released = %d\n", button->buttonName, button->released);
+    Serial.printf("Button %s . released = %s\n", button->buttonName, button->buttonReturn);
 
     if (button->released) {
       Serial.printf("Button %s: %u\n", button->buttonName, button->buttonReturn);
-      button->buttonReturn = "blank";  // base value, tasker to ignore if set to this
+      button->buttonReturn = "none";  // base value, tasker to ignore if set to this
     
     }
   }

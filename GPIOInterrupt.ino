@@ -40,8 +40,14 @@ Button buttonsUsed[numButtons] = { buttonA, buttonB };  // Include all button va
 // IRC counter, volatile to exempt from compiler optimizations
 // volatile int interruptCounter;
 
-// define timer as hw_timer_t type, set to NULL
- hw_timer_t * doubleClickTimer[numButtons] = {NULL};
+// define timers as hw_timer_t type, set to NULL
+hw_timer_t* doubleClickTimer0 = NULL;
+hw_timer_t* doubleClickTimer1 = NULL;
+hw_timer_t* doubleClickTimer2 = NULL;
+hw_timer_t* doubleClickTimer3 = NULL;
+
+// Create array of hw_timer_t pointer types
+hw_timer_t* doubleClickTimer[numButtons] = {NULL};
 // ------------------------------------------------------------------------------
 
 
@@ -98,35 +104,39 @@ void ARDUINO_ISR_ATTR isr(void* arg) {
 
 // -------------------------------------------------- TIMER INTERRUPT FUNCTION --
  // Interrupt timer function for button number 0
- void IRAM_ATTR onTimer0() {
-   Button tempButton = buttonsUsed[0];
-   tempButton.buttonReturn = tempButton.singleClickValue;
-   tempButton.singlePressActive = false;
-   tempButton.released = true;
+void IRAM_ATTR onTimer0() {
+  Button tempButton = buttonsUsed[0];
+  tempButton.buttonReturn = tempButton.singleClickValue;
+  tempButton.singlePressActive = false;
+  tempButton.released = true;
+  Serial.println("onTimer0 debug");
 }
 
  // Interrupt timer function for button number 1
 void IRAM_ATTR onTimer1() {
-   Button tempButton = buttonsUsed[1];
-   tempButton.buttonReturn = tempButton.singleClickValue;
-   tempButton.singlePressActive = false;
-   tempButton.released = true;
+  Button tempButton = buttonsUsed[1];
+  tempButton.buttonReturn = tempButton.singleClickValue;
+  tempButton.singlePressActive = false;
+  tempButton.released = true;
+  Serial.println("onTimer1 debug");
 }
 
  // Interrupt timer function for button number 2
 void IRAM_ATTR onTimer2() {
-   Button tempButton = buttonsUsed[2];
-   tempButton.buttonReturn = tempButton.singleClickValue;
-   tempButton.singlePressActive = false;
-   tempButton.released = true;
+  Button tempButton = buttonsUsed[2];
+  tempButton.buttonReturn = tempButton.singleClickValue;
+  tempButton.singlePressActive = false;
+  tempButton.released = true;
+  Serial.println("onTimer2 debug");
 }
 
  // Interrupt timer function for button number 3
 void IRAM_ATTR onTimer3() { 
-   Button tempButton = buttonsUsed[3];
-   tempButton.buttonReturn = tempButton.singleClickValue;
-   tempButton.singlePressActive = false;
-   tempButton.released = true;
+  Button tempButton = buttonsUsed[3];
+  tempButton.buttonReturn = tempButton.singleClickValue;
+  tempButton.singlePressActive = false;
+  tempButton.released = true;
+  Serial.println("onTimer3 debug");
 }
 
  // Create an array of the interrupt timer functions
@@ -144,9 +154,9 @@ void setup() {
   for (uint8_t i = 0; i < numButtons; i++) {
 
     // --------------------------------- BUTTON INTERRUPT INITIALIZATION --------
-    Button button = buttonsUsed[i];
-    pinMode(button.PIN, INPUT_PULLUP);
-    attachInterruptArg(button.PIN, isr, &button, CHANGE);
+    Button* button = &buttonsUsed[i];
+    pinMode(button->PIN, INPUT_PULLUP);
+    attachInterruptArg(button->PIN, isr, &button, CHANGE);
     // --------------------------------------------------------------------------
 
     // ---------------------------------- TIMER INTERRUPT INITIALIZATION --------
@@ -190,65 +200,15 @@ void setup() {
 }
 
 void loop() {
-
   // ------------------------------------------------------ BUTTON INPUT CHECK --
   for (uint8_t i = 0; i < numButtons; i++) {
-    Button button = buttonsUsed[i];
-    if (button.released) {
-      Serial.printf("Button %u: %u\n", button.buttonName, button.buttonReturn);
-      button.buttonReturn = 'z';  // base value, tasker to ignore if set to this
+    Button* button = &buttonsUsed[i];
+    Serial.printf("Button %s . released = %d\n", button->buttonName, button->released);
+
+    if (button->released) {
+      Serial.printf("Button %s: %u\n", button->buttonName, button->buttonReturn);
+      button->buttonReturn = "blank";  // base value, tasker to ignore if set to this
     
     }
   }
 }
-
-  /*
-  if (button1.released) {
-    button1.released = false;        // Reset released value regardless of press type
-    if (button1.clickType == 's') {  // Button 1
-      // If button 1 is long pressed
-      Serial.println('Button 1 was long pressed for longer than 3 seconds, and the interrupt function toggled on/off.');
-      button1.toggleOn = !button1.toggleOn;  // Does not detach the interrupt, just toggles this loop to register it or not
-      return;
-      // If button 1 interrupt is disabled and not long pressed
-    } else if (button1.timePressed <= longPressTime && button1.toggleOn == false) {
-      return;
-      // If button 1 interrupt is enabled and not long pressed
-    } else {
-      button1.curRelease = button1.lastTriggerTime;
-      if ((button1.curRelease - button1.lastRelease) <= doubleClickTime) {  // Button 1 double click timing definition
-        // If button 1 is double pressed (long press doesn't count as a second press)
-        Serial.printf('Button 1 was double pressed!!! There were only %u milliseconds between the last two presses!\n', (button1.curRelease - button1.lastRelease));
-      } else {
-        // If button 1 is single pressed
-
-        button1.numberKeyPresses++;
-        Serial.printf('Button 1 has been pressed %u times. The last press was %u milliseconds long.\n', button1.numberKeyPresses, button1.timePressed);
-      }
-      button1.lastRelease = button1.lastTriggerTime;
-    }
-  }
-
-  // Button 2 ----------------------------- //
-  if (button2.released) {  // If button 2 is single pressed (No double press or long press defined)
-    button2SingleClick();
-  }
-*/
-
-
-/*
-void button2SingleClick() {
-  button2.curRelease = button2.lastTriggerTime;
-  button2.numberKeyPresses++;
-  Serial.printf('Button 2 has been pressed %u times. The last press was %u milliseconds long.\n', button2.numberKeyPresses, button2.timePressed);
-  button2.released = false;
-  button2.curRelease = button2.lastTriggerTime;
-}
-*/
-/*
-NEED TO SET UP A TIMER INTERRUPT TO SAME LENGTH AS DOUBLE CLICK TIMING, TO RUN
-ONLY IF NO DOUBLE CLICK - ENABLE IT HERE, AND DISABLE IT IN THE DOUBLE CLICK FUNCTION,
-AND MOVE THE SINGLE CLICK ACTIONS INTO THE TIMER INTERRUPT. ALSO, HAVE INDIVIDUAL 
-FUNCTIONS CALLED OUT FOR EACH BUTTON#SINGLE,DOUBLE,LONG CLICKS, TO MORE EASILY ENTER 
-WHAT EACH ONE DOES, RATHER THAN HAVING TO DIG THROUGH ALL THESE IF-THEN STATEMENTS
-*/

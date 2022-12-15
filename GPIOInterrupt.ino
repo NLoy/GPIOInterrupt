@@ -9,6 +9,9 @@ struct Button {
   uint8_t NUM;
   uint32_t numberKeyPresses;
   bool pressed;
+  bool stateDebounce;
+  uint32_t lastDebounceTime;
+  uint32_t curDebounceTime;
   uint32_t lastTriggerTime;
   uint32_t curTriggerTime;
   uint32_t timePressed;
@@ -28,8 +31,8 @@ const uint16_t longPressTime = 3000;
 const uint16_t doubleClickTime = 350;
 
 // Button Initialization
-Button buttonA = { 0, "Front", 0, 0, false, 0, 0, 0, false, true, false, "toggle_play_pause", "activate_google_assistant", "turn_off_screen", "none"};
-Button buttonB = {26, "Side",  1, 0, false, 0, 0, 0, false, true, false, "next_song",         "last_song", "navigate_home", "none"};
+Button buttonA = { 0, "Front", 0, 0, false, false, 0, 0, 0, 0, 0, false, true, false, "toggle_play_pause", "activate_google_assistant", "turn_off_screen", "none"};
+Button buttonB = {26, "Side",  1, 0, false, false, 0, 0, 0, 0, 0, false, true, false, "next_song",         "last_song", "navigate_home", "none"};
 const uint8_t numButtons = 2;                                 // Match to total number of buttons, max of 4 timer interrupts for esp32
 Button buttonsUsed[numButtons] = { buttonA, buttonB };  // Include all button variables, only first (4) index locations use interrupts (allows double click)
 // ------------------------------------------------------------------------------
@@ -60,20 +63,27 @@ void ARDUINO_ISR_ATTR isr(void* arg) {
     // static_cast<new-type>(expression) :::: Returns a value of type "new-type"
 
   // Get current time of event
-  s->curTriggerTime = millis();
+  s->curDebounceTime = millis();
 
   // Debounce & factor for double press on changes for buttons with
   // inline diodes (button B on M5 StickCPlus)
-  if ((s->curTriggerTime - s->lastTriggerTime) <= debounceTime) {
+  if ((s->curDebounceTime - s->lastDebounceTime) <= debounceTime) {
+    s->lastDebounceTime = s->curDebounceTime;
+    s->stateDebounce = !(s->stateDebounce);
     return;
+  } else {  
+  s->curTriggerTime = s->curDebounceTime;
+  s->pressed = s->stateDebounce;
   }
 
   // Check if this is a button press or button release
   if (s->pressed == false) {  // ON BUTTON PRESS
     s->pressed = true;
+    s->stateDebounce = true;
 
   } else {  // ON BUTTON RELEASE
     s->pressed = false;
+    s->stateDebounce = false;
     s->timePressed = (s->curTriggerTime - s->lastTriggerTime);
     s->lastTriggerTime = s->curTriggerTime;
 
@@ -86,15 +96,19 @@ void ARDUINO_ISR_ATTR isr(void* arg) {
       s->singlePressActive = true;
       switch(s->NUM) {
         case 0:
-          timerStart(doubleClickTimer0);
+          timerWrite(doubleClickTimer0, 0);
+          timerAlarmEnable(doubleClickTimer0);
           break;
         case 1:
-          timerStart(doubleClickTimer1);
+          timerWrite(doubleClickTimer1, 0);
+          timerAlarmEnable(doubleClickTimer1);
           break;
         case 2:
+          timerWrite(doubleClickTimer2, 0);
           timerStart(doubleClickTimer2);
           break;
         case 3:
+          timerWrite(doubleClickTimer3, 0);
           timerStart(doubleClickTimer3);
           break;
       }
@@ -103,19 +117,15 @@ void ARDUINO_ISR_ATTR isr(void* arg) {
       switch(s->NUM) {
         case 0:
           timerStop(doubleClickTimer0);
-          timerWrite(doubleClickTimer0, 0);
           break;
         case 1:
           timerStop(doubleClickTimer1);
-          timerWrite(doubleClickTimer1, 0);
           break;
         case 2:
           timerStop(doubleClickTimer2);
-          timerWrite(doubleClickTimer2, 0);
           break;
         case 3:
           timerStop(doubleClickTimer3);
-          timerWrite(doubleClickTimer3, 0);
           break;
       }
       s->singlePressActive = false;
@@ -131,37 +141,37 @@ void ARDUINO_ISR_ATTR isr(void* arg) {
 // -------------------------------------------------- TIMER INTERRUPT FUNCTION --
  // Interrupt timer function for button number 0
 void IRAM_ATTR onTimer0() {
-  Button tempButton = buttonsUsed[0];
-  tempButton.buttonReturn = tempButton.singleClickValue;
-  tempButton.singlePressActive = false;
-  tempButton.released = true;
+  Button* tempButton = &(buttonsUsed[0]);
+  tempButton->buttonReturn = tempButton->singleClickValue;
+  tempButton->singlePressActive = false;
+  tempButton->released = true;
   Serial.println("onTimer0 debug");
 }
 
  // Interrupt timer function for button number 1
 void IRAM_ATTR onTimer1() {
-  Button tempButton = buttonsUsed[1];
-  tempButton.buttonReturn = tempButton.singleClickValue;
-  tempButton.singlePressActive = false;
-  tempButton.released = true;
+  Button* tempButton = &(buttonsUsed[1]);
+  tempButton->buttonReturn = tempButton->singleClickValue;
+  tempButton->singlePressActive = false;
+  tempButton->released = true;
   Serial.println("onTimer1 debug");
 }
 
  // Interrupt timer function for button number 2
 void IRAM_ATTR onTimer2() {
-  Button tempButton = buttonsUsed[2];
-  tempButton.buttonReturn = tempButton.singleClickValue;
-  tempButton.singlePressActive = false;
-  tempButton.released = true;
+  Button* tempButton = &(buttonsUsed[2]);
+  tempButton->buttonReturn = tempButton->singleClickValue;
+  tempButton->singlePressActive = false;
+  tempButton->released = true;
   Serial.println("onTimer2 debug");
 }
 
  // Interrupt timer function for button number 3
 void IRAM_ATTR onTimer3() { 
-  Button tempButton = buttonsUsed[3];
-  tempButton.buttonReturn = tempButton.singleClickValue;
-  tempButton.singlePressActive = false;
-  tempButton.released = true;
+  Button* tempButton = &(buttonsUsed[3]);
+  tempButton->buttonReturn = tempButton->singleClickValue;
+  tempButton->singlePressActive = false;
+  tempButton->released = true;
   Serial.println("onTimer3 debug");
 }
 // ------------------------------------------------------------------------------
@@ -175,9 +185,11 @@ void setup() {
   for (uint8_t i = 0; i < numButtons; i++) {
 
     // --------------------------------- BUTTON INTERRUPT INITIALIZATION --------
-    Button* button = &buttonsUsed[i];
+    //Button* button = *(buttonsUsed + i);
+    //  Button *s = static_cast<Button*>(arg); 
+    Button* button = &(buttonsUsed[i]);
     pinMode(button->PIN, INPUT_PULLUP);
-    attachInterruptArg(button->PIN, isr, &button, CHANGE);
+    attachInterruptArg(button->PIN, isr, button, CHANGE);
     // --------------------------------------------------------------------------
 
     // ---------------------------------- TIMER INTERRUPT INITIALIZATION --------
@@ -199,6 +211,7 @@ void setup() {
         timerAlarmWrite(doubleClickTimer0, doubleClickTime, false);
         // Enables the timerAlarm of: timername - does NOT start the timer!
         timerAlarmEnable(doubleClickTimer0);
+        timerStop(doubleClickTimer0);
         break;
       case 1:
         // Initialize the timer, with variables: (# = 0,1,2,3) of which interrupt
@@ -213,6 +226,7 @@ void setup() {
         timerAlarmWrite(doubleClickTimer1, doubleClickTime, false);
         // Enables the timerAlarm of: timername - does NOT start the timer!
         timerAlarmEnable(doubleClickTimer1);
+        timerStop(doubleClickTimer1);
         break;
       case 2:
         // Initialize the timer, with variables: (# = 0,1,2,3) of which interrupt
@@ -227,6 +241,7 @@ void setup() {
         timerAlarmWrite(doubleClickTimer2, doubleClickTime, false);
         // Enables the timerAlarm of: timername - does NOT start the timer!
         timerAlarmEnable(doubleClickTimer2);
+        timerStop(doubleClickTimer2);
         break;
       case 3:
         // Initialize the timer, with variables: (# = 0,1,2,3) of which interrupt
@@ -241,6 +256,7 @@ void setup() {
         timerAlarmWrite(doubleClickTimer3, doubleClickTime, false);
         // Enables the timerAlarm of: timername - does NOT start the timer!
         timerAlarmEnable(doubleClickTimer3);
+        timerStop(doubleClickTimer3);
         break;
     }
     // --------------------------------------------------------------------------
@@ -250,13 +266,12 @@ void setup() {
 void loop() {
   // ------------------------------------------------------ BUTTON INPUT CHECK --
   for (uint8_t i = 0; i < numButtons; i++) {
-    Button* button = &buttonsUsed[i];
-    Serial.printf("Button %s . released = %s\n", button->buttonName, button->buttonReturn);
-
-    if (button->released) {
-      Serial.printf("Button %s: %u\n", button->buttonName, button->buttonReturn);
-      button->buttonReturn = "none";  // base value, tasker to ignore if set to this
-    
+    Button* button = &(buttonsUsed[i]);
+    if (button->released == true) {
+      Serial.printf("Button %s: %s\n", button->buttonName, button->buttonReturn);
+      button->buttonReturn = "none";  // reset return to none, tasker to ignore if set to this
+      button->released = false; // reset released to false
+      delay(100);    
     }
   }
 }
